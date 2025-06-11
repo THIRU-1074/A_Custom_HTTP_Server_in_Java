@@ -1,8 +1,10 @@
 package customHttpServer;
 
-import java.io.IOException;
+import java.awt.image.BufferedImage;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import javax.imageio.ImageIO;
 
 abstract class Content {
 
@@ -15,6 +17,7 @@ abstract class Content {
 
 class JSON extends Content {
 
+    @Override
     void serialize() {
 
     }
@@ -22,6 +25,7 @@ class JSON extends Content {
 
 class text extends Content {
 
+    @Override
     void serialize() {
 
     }
@@ -35,11 +39,32 @@ class html extends Content {
         this.path = path;
     }
 
+    @Override
     void serialize() {
         try {
-            serialized = Files.readString(Paths.get(path)); // Java 11+
+            serialized = Files.readString(Paths.get(path));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
 
-            //System.out.println(html); // or send over socket
+class image extends Content {
+
+    String path;
+
+    image(String path) {
+        this.path = path;
+    }
+    byte[] serialized;
+
+    void serialize() {
+        BufferedImage original;
+        try {
+            original = ImageIO.read(new File(path));
+
+            // Serialize to file
+            serialized = ImageSerializer.imageToBytes(original, "png");
         } catch (IOException e) {
             e.printStackTrace();
         }
