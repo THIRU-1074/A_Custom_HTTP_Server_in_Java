@@ -19,8 +19,18 @@ public class Server {
             localObJson.add("Name", "RegNo");
             localObJson.add("Thiru", "22BEC1473");
         });
+        app.POST("/login", () -> {
+            JSON localObJson = (JSON) app.req.body;
+            String userName = (String) localObJson.get("user_name");
+            String password = (String) localObJson.get("password");
+            System.out.println(userName + password);
+        });
+        app.GET("/login", () -> {
+            app.res.body = new html("src/resources/login.html");
+        });
         app.listen(5000, () -> {
             System.out.println("The Server is Running...");
         });
+
     }
 }

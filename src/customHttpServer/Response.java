@@ -31,30 +31,34 @@ class Response {
     }
 
     void serialize() {
-        body.serialize();
-        switch (body) {
-            case image img -> {
-                headers.put("Content-Type", "image/" + img.format);
-                break;
-            }
-            case JSON json -> {
-                headers.put("Content-Type", "application/json");
-            }
-            case html html -> {
-                headers.put("Content-Type", "text/html");
-            }
-            case text txt -> {
-                headers.put("Content-Type", "text/plain");
-            }
-            default -> {
+        if (body != null) {
+            body.serialize();
+            switch (body) {
+                case image img -> {
+                    headers.put("Content-Type", "image/" + img.format);
+                    break;
+                }
+                case JSON json -> {
+                    headers.put("Content-Type", "application/json");
+                }
+                case html html -> {
+                    headers.put("Content-Type", "text/html");
+                }
+                case text txt -> {
+                    headers.put("Content-Type", "text/plain");
+                }
+                default -> {
 
+                }
             }
-        }
-        if (body instanceof image) {
-            image img = (image) body;
-            headers.put("Content-Length", String.valueOf(img.imageSerial.length));
+            if (body instanceof image) {
+                image img = (image) body;
+                headers.put("Content-Length", String.valueOf(img.imageSerial.length));
+            } else {
+                headers.put("Content-Length", String.valueOf(body.serialized.getBytes(StandardCharsets.UTF_8).length));
+            }
         } else {
-            headers.put("Content-Length", String.valueOf(body.serialized.getBytes(StandardCharsets.UTF_8).length));
+            headers.put("Content-Length", "0");
         }
         serialized
                 = version + " " + String.valueOf(statusCode) + " " + statusMap.get(statusCode) + "\r\n";

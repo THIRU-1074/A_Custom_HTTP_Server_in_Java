@@ -10,7 +10,6 @@ public class Jolt {
 
     Request req;
     Response res;
-    Socket socket;
     Map<String, ArrayList<Runnable>> getHandlers;
     Map<String, ArrayList<Runnable>> postHandlers;
     int callBackLen;
@@ -42,80 +41,97 @@ public class Jolt {
         }
     }
 
-    void listen(int port, Runnable callBack) {
+    void parseRequest(BufferedReader reader, Socket socket) {
+        String line;
+        try {
+            line = reader.readLine();
+            if (line == null || line.length() == 0) {
+                socket.close();
+                return;
+            }
+            // Start Line
+            System.out.println(line);
+            req.method = line.split(" ")[0];
+            req.url = line.split(" ")[1];
+            req.version = line.split(" ")[2];
 
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            callBack.run();
+            // Read Header
+            while ((line = reader.readLine()) != null && !(line.isEmpty())) {
+                System.out.println(line);
+                req.headers.put(line.split(": ")[0], line.split(": ")[1]);
+            }
+
+            // Read body
+            if (req.headers.get("Content-Length") != null) {
+                switch (req.headers.get("Content-Type")) {
+                    case ("application/json") -> {
+                        req.body = new JSON();
+                    }
+                    default -> {
+                        req.body = new text();
+                    }
+                }
+                req.body.contentLength = Integer.parseInt(req.headers.get("Content-Length"));
+                req.body.contentType = req.headers.get("Content-Type");
+                char[] body = new char[req.body.contentLength];
+                reader.read(body, 0, req.body.contentLength);
+                req.body.serialized = new String(body);
+                req.body.deserialize();
+                System.out.println("Received: " + new String(body));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    void handleRequest() {
+        switch (req.method) {
+            case ("GET") -> {
+                if (getHandlers.get(req.url) != null) {
+                    res.statusCode = 200;
+                } else {
+                    res.statusCode = 404;
+                    break;
+                }
+                int i = 0;
+                while (i == callBackLen) {
+                    getHandlers.get(req.url).get(i).run();
+                    i++;
+                }
+                break;
+            }
+            case ("POST") -> {
+                int i = 0;
+                if (postHandlers.get(req.url) != null) {
+                    res.statusCode = 200;
+                } else {
+                    res.statusCode = 404;
+                    break;
+                }
+                while (i == callBackLen) {
+                    postHandlers.get(req.url).get(i).run();
+                    i++;
+                }
+            }
+        }
+    }
+
+    void handleClient(Socket socket) {
+        try {
             try {
+                socket.setSoTimeout(120000);
+                System.out.println("New client connected");
                 while (true) {
-                    socket = serverSocket.accept();
-                    socket.setSoTimeout(5000);
-                    System.out.println("New client connected");
-
-// Read data from client
+                    // Read data from client
                     BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                    String line;
-                    line = reader.readLine();
-                    if (line == null || line.length() == 0) {
-                        socket.close();
-                        continue;
-                    }
-// Start Line
-                    System.out.println(line);
-                    req.method = line.split(" ")[0];
-                    req.url = line.split(" ")[1];
-                    req.version = line.split(" ")[2];
-// Read Header
-                    while ((line = reader.readLine()) != null && !(line.isEmpty())) {
-                        System.out.println(line);
-                        req.headers.put(line.split(": ")[0], line.split(": ")[1]);
-                    }
-// Read body
-                    if (req.headers.get("Content-Length") != null) {
-                        switch (req.headers.get("Content-Type")) {
-                            case ("JSON") -> {
-                                req.body = new JSON();
-                            }
-                            default -> {
-                                req.body = new text();
-                            }
-                        }
-                        req.body.contentLength = Integer.parseInt(req.headers.get("Content-Length"));
-                        req.body.contentType = req.headers.get("Content-Type");
-                        char[] body = new char[req.body.contentLength];
-                        reader.read(body, 0, req.body.contentLength);
-                        req.body.serialized = new String(body);
-                        System.out.println("Received: " + new String(body));
-                    }
-                    switch (req.method) {
-                        case ("GET") -> {
-                            if (getHandlers.get(req.url) != null) {
-                                res.statusCode = 200;
-                            }
-                            int i = 0;
-                            while (i == callBackLen) {
-                                getHandlers.get(req.url).get(i).run();
-                                i++;
-                            }
-                            break;
-                        }
-                        case ("POST") -> {
-                            int i = 0;
-                            if (postHandlers.get(req.url) != null) {
-                                res.statusCode = 200;
-                            }
-                            while (i == callBackLen) {
-                                postHandlers.get(req.url).get(i).run();
-                                i++;
-                            }
-                        }
-                    }
-                    if (!respond()) {
+                    parseRequest(reader, socket);
+                    handleRequest();
+                    if (!provideResponse(socket)) {
                         break;
                     }
                 }
             } catch (SocketException e) {
-                System.out.println("Read TimeOut....Closing Client Socket");
+                System.out.println("Closing Client Socket");
                 socket.close();
             }
         } catch (IOException e) {
@@ -123,13 +139,29 @@ public class Jolt {
         }
     }
 
-    boolean respond() {
+    void listen(int port, Runnable callBack) {
+        while (true) {
+            try (ServerSocket serverSocket = new ServerSocket(port)) {
+                callBack.run();
+                new Thread(() -> {
+                    try {
+                        handleClient(serverSocket.accept());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }).run();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    boolean provideResponse(Socket socket) {
         try {
             res.serialize();
             OutputStream outputStream = socket.getOutputStream();
             outputStream.write(res.serialized.getBytes());
-            if (res.body instanceof image) {
-                image img = (image) res.body;
+            if (res.body == null); else if (res.body instanceof image img) {
                 outputStream.write(img.imageSerial);
             } else {
                 outputStream.write(res.body.serialized.getBytes());
@@ -140,9 +172,9 @@ public class Jolt {
             }
             socket.close();
             System.out.println("Client disconnected");
-            return false;
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return false;
     }
 }

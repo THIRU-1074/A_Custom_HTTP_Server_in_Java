@@ -14,6 +14,8 @@ abstract class Content {
     int contentLength;
     String contentType;
 
+    abstract void deserialize();
+
     abstract void serialize();
 }
 
@@ -29,12 +31,26 @@ class JSON extends Content {
     void serialize() {
         serialized = json.toJSONString();
     }
+
+    @Override
+    void deserialize() {
+        json = (JSONObject) JSONValue.parse(serialized);
+    }
+
+    String get(String key) {
+        return (String) json.get(key);
+    }
 }
 
 class text extends Content {
 
     @Override
     void serialize() {
+
+    }
+
+    @Override
+    void deserialize() {
 
     }
 }
@@ -54,6 +70,11 @@ class html extends Content {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    @Override
+    void deserialize() {
+
     }
 }
 
@@ -81,5 +102,10 @@ class image extends Content {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    @Override
+    void deserialize() {
+
     }
 }
