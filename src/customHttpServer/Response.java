@@ -32,14 +32,37 @@ class Response {
 
     void serialize() {
         body.serialize();
+        switch (body) {
+            case image img -> {
+                headers.put("Content-Type", "image/" + img.format);
+                break;
+            }
+            case JSON json -> {
+                headers.put("Content-Type", "application/json");
+            }
+            case html html -> {
+                headers.put("Content-Type", "text/html");
+            }
+            case text txt -> {
+                headers.put("Content-Type", "text/plain");
+            }
+            default -> {
+
+            }
+        }
+        if (body instanceof image) {
+            image img = (image) body;
+            headers.put("Content-Length", String.valueOf(img.imageSerial.length));
+        } else {
+            headers.put("Content-Length", String.valueOf(body.serialized.getBytes(StandardCharsets.UTF_8).length));
+        }
         serialized
                 = version + " " + String.valueOf(statusCode) + " " + statusMap.get(statusCode) + "\r\n";
-        serialized += "Content-Length: " + body.serialized.getBytes(StandardCharsets.UTF_8).length + "\r\n";
         for (Map.Entry<String, String> element : headers.entrySet()) {
             String key = element.getKey();
             String val = element.getValue();
             serialized += key + ": " + val + "\r\n";
         }
-        serialized += "\r\n" + body.serialized;
+        serialized += "\r\n";
     }
 }

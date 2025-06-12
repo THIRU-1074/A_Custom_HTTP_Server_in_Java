@@ -5,6 +5,8 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import javax.imageio.ImageIO;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
 
 abstract class Content {
 
@@ -17,9 +19,15 @@ abstract class Content {
 
 class JSON extends Content {
 
+    JSONObject json = new JSONObject();
+
+    void add(String key, String value) {
+        json.put(key, value);
+    }
+
     @Override
     void serialize() {
-
+        serialized = json.toJSONString();
     }
 }
 
@@ -52,19 +60,24 @@ class html extends Content {
 class image extends Content {
 
     String path;
+    String format;
 
     image(String path) {
         this.path = path;
+        format = path.substring(path.lastIndexOf('.') + 1);
     }
-    byte[] serialized;
+    byte[] imageSerial;
 
+    @Override
     void serialize() {
-        BufferedImage original;
+        BufferedImage bImage;
         try {
-            original = ImageIO.read(new File(path));
-
+            bImage = ImageIO.read(new File(path));
             // Serialize to file
-            serialized = ImageSerializer.imageToBytes(original, "png");
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ImageIO.write(bImage, format, bos);
+            imageSerial = bos.toByteArray();
+            System.out.println(imageSerial.length);
         } catch (IOException e) {
             e.printStackTrace();
         }
